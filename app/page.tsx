@@ -7,14 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { getDemoIncident, getHealth, getInvestigations, startInvestigation, type InvestigationResult } from '@/lib/api';
 
-const demoTimeline = [
-  { time: '14:32:08', icon: Zap, tone: 'red', title: 'Alert received', detail: 'Checkout p95 latency exceeded 8s after deploy api-7f2c9d.' },
-  { time: '14:32:11', icon: MemoryStick, tone: 'violet', title: 'Retrieved 3 relevant memories', detail: 'Highest match: INC-031 · Redis connection leak · 0.91 similarity' },
-  { time: '14:32:17', icon: GitCommitHorizontal, tone: 'blue', title: 'Compared latest deployment', detail: 'REDIS_POOL_SIZE changed 40 → 8 in checkout production config.' },
-  { time: '14:32:24', icon: TerminalSquare, tone: 'amber', title: 'Tested connection exhaustion', detail: 'Pool waiters climb with traffic; payment provider latency remains nominal.' },
-  { time: '14:32:31', icon: Check, tone: 'green', title: 'Root cause confirmed', detail: 'Malformed deployment config undersized the Redis pool by 80%.' },
-];
-
 const toolPresentation = {
   query_metrics: { icon: Activity, tone: 'blue', title: 'Queried service metrics' },
   search_logs: { icon: TerminalSquare, tone: 'amber', title: 'Searched production logs' },
@@ -38,12 +30,6 @@ const memories = [
   { type: 'PROCEDURAL', color: 'amber', score: '83%', title: 'Checkout timeout triage', body: 'Compare latency by dependency, then correlate pool saturation with the latest config changes.', meta: 'Success rate 86% · Used 7 times' },
 ];
 
-const hypotheses = [
-  { rank: 1, confidence: 94, title: 'Redis pool undersized by deploy', state: 'confirmed', evidence: 'Config diff + pool waiters + recovery in sandbox' },
-  { rank: 2, confidence: 12, title: 'Payment provider degradation', state: 'ruled out', evidence: 'Provider p95 stable at 312ms; no 5xx increase' },
-  { rank: 3, confidence: 8, title: 'Inventory lock contention', state: 'ruled out', evidence: 'Inventory spans remain below baseline' },
-];
-
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'investigation' | 'memory' | 'comparison'>('investigation');
   const [query, setQuery] = useState('Checkout requests started timing out after the latest deploy.');
@@ -54,7 +40,9 @@ export default function Home() {
   const [resultOrigin, setResultOrigin] = useState<'live' | 'restored' | null>(null);
   const [scenario, setScenario] = useState<'first' | 'second'>('second');
   const stats = useMemo(() => scenario === 'first' ? { steps: 11, time: '6m 42s', deadEnds: 3, confidence: 86 } : { steps: 5, time: '2m 18s', deadEnds: 0, confidence: 94 }, [scenario]);
-  const timeline = result ? timelineFromResult(result) : demoTimeline;
+  const timeline = result ? timelineFromResult(result) : [];
+
+  const evidenceById = useMemo(() => new Map(result?.evidence.map(item => [item.id, item.summary]) ?? []), [result]);
 
   useEffect(() => {
     let active = true;
@@ -99,9 +87,9 @@ export default function Home() {
     <section className="command-wrap"><div className="command"><Search size={19} /><input aria-label="Incident description" value={query} onChange={e => setQuery(e.target.value)} /><Button onClick={runInvestigation} disabled={running || !query.trim()} className="run-button">{running ? 'Investigating…' : 'Investigate'} <ArrowUpRight size={16} /></Button></div><p><ShieldCheck size={13} /> Read-only diagnostics · fixes run only in sandbox</p>{apiError && <div className="api-error" role="alert"><X size={14}/><span>FastAPI is unavailable. Start it on port 8000 and try again.</span></div>}</section>
 
     {activeTab === 'investigation' && <div className="workspace-grid">
-      <section className="panel timeline-panel"><div className="panel-head"><div><p className="eyebrow">LIVE INVESTIGATION</p><h2>Evidence trail</h2></div><span className={`live-pill ${result ? 'api-backed' : ''}`}><span /> {resultOrigin === 'restored' ? 'Restored from Atlas' : result ? 'API result' : 'Demo state'}</span></div><div className="timeline">{timeline.map((item,index) => <div className="timeline-item" key={`${item.time}-${item.title}`}><div className={`timeline-icon ${item.tone}`}><item.icon size={16}/></div><div className="timeline-copy"><div><time>{item.time}</time><strong>{item.title}</strong></div><p>{item.detail}</p></div>{index < timeline.length-1 && <div className="timeline-line"/>}</div>)}</div><div className="diagnosis"><div className="diagnosis-title"><Check size={17}/><strong>{result ? 'Persisted investigation loaded' : 'Evidence-backed diagnosis'}</strong><Badge>{result ? `${result.actions.length} actions` : '94% confidence'}</Badge></div><p>{result ? <>Investigation <code>{result.investigation_id}</code> for incident <code>{result.incident_id}</code> is backed by Atlas. Refreshing the page reloads this timeline from FastAPI.</> : <>Deploy <code>api-7f2c9d</code> reduced <code>REDIS_POOL_SIZE</code> from 40 to 8. Under production traffic, checkout workers exhaust the pool and wait until the 8-second request timeout.</>}</p><div className="remedy"><Lightbulb size={16}/><span><b>Next:</b> {result ? 'Connect retrieved memories and hypotheses to persisted Atlas data.' : 'Restore pool size to 40, roll back the config-only change, and add a deploy guard requiring pool size ≥ worker concurrency.'}</span></div></div></section>
+      <section className="panel timeline-panel"><div className="panel-head"><div><p className="eyebrow">LIVE INVESTIGATION</p><h2>Evidence trail</h2></div><span className={`live-pill ${result ? 'api-backed' : ''}`}><span /> {resultOrigin === 'restored' ? 'Restored from Atlas' : result ? 'API result' : 'Ready'}</span></div>{timeline.length ? <div className="timeline">{timeline.map((item,index) => <div className="timeline-item" key={`${item.time}-${item.title}`}><div className={`timeline-icon ${item.tone}`}><item.icon size={16}/></div><div className="timeline-copy"><div><time>{item.time}</time><strong>{item.title}</strong></div><p>{item.detail}</p></div>{index < timeline.length-1 && <div className="timeline-line"/>}</div>)}</div> : <div className="timeline-empty"><TerminalSquare size={22}/><strong>No investigation run yet</strong><p>Describe the production symptom above, then select Investigate to gather read-only evidence.</p></div>}{result && <div className="diagnosis"><div className="diagnosis-title"><Check size={17}/><strong>Evidence-backed diagnosis</strong><Badge>{Math.round(Math.max(...result.hypotheses.map(h => h.confidence), 0) * 100)}% confidence</Badge></div><p>{result.diagnosis ?? 'The diagnostic pass completed without a confirmed root cause.'}</p><div className="remedy"><Lightbulb size={16}/><span><b>Remediation plan:</b> {result.remediation.length ? result.remediation.join(' ') : 'No remediation has been proposed.'}</span></div></div>}</section>
       <aside className="side-stack"><section className="panel memory-panel"><div className="panel-head"><div><p className="eyebrow">RETRIEVED MEMORY</p><h2>What the team already knows</h2></div><BrainCircuit size={19}/></div><div className="memory-list">{memories.map(m => <article className="memory-card" key={m.title}><div className="memory-label"><span className={m.color}>{m.type}</span><b>{m.score}</b></div><h3>{m.title}</h3><p>{m.body}</p><footer>{m.meta}</footer></article>)}</div></section></aside>
-      <section className="panel hypothesis-panel"><div className="panel-head"><div><p className="eyebrow">REASONING STATE</p><h2>Current hypotheses</h2></div><span className="action-count">5 / 20 actions</span></div><div className="hypothesis-list">{hypotheses.map(h => <article className="hypothesis" key={h.rank}><span className="rank">0{h.rank}</span><div className="hyp-main"><div className="hyp-title"><h3>{h.title}</h3><span className={h.state === 'confirmed' ? 'confirmed':'ruled'}>{h.state === 'confirmed' ? <Check size={12}/> : <X size={12}/>} {h.state}</span></div><p>{h.evidence}</p><Progress value={h.confidence} className={h.state === 'confirmed' ? 'progress-good':'progress-muted'}/></div><strong>{h.confidence}%</strong></article>)}</div></section>
+      <section className="panel hypothesis-panel"><div className="panel-head"><div><p className="eyebrow">REASONING STATE</p><h2>Current hypotheses</h2></div><span className="action-count">{result?.actions.length ?? 0} / 20 actions</span></div>{result?.hypotheses.length ? <div className="hypothesis-list">{result.hypotheses.map((hypothesis, index) => { const confirmed = hypothesis.status === 'confirmed'; const confidence = Math.round(hypothesis.confidence * 100); const evidence = hypothesis.evidence_ids.map(id => evidenceById.get(id)).filter(Boolean).join(' '); return <article className="hypothesis" key={hypothesis.id}><span className="rank">{String(index + 1).padStart(2, '0')}</span><div className="hyp-main"><div className="hyp-title"><h3>{hypothesis.statement}</h3><span className={confirmed ? 'confirmed':'ruled'}>{confirmed ? <Check size={12}/> : <X size={12}/>} {hypothesis.status.replaceAll('_', ' ')}</span></div><p>{evidence || 'No linked evidence was recorded.'}</p><Progress value={confidence} className={confirmed ? 'progress-good':'progress-muted'}/></div><strong>{confidence}%</strong></article>; })}</div> : <div className="hypothesis-empty"><BrainCircuit size={20}/><span>Hypotheses will appear after evidence is gathered.</span></div>}</section>
     </div>}
     {activeTab === 'memory' && <MemoryView/>}
     {activeTab === 'comparison' && <Comparison stats={stats} scenario={scenario} setScenario={setScenario}/>} 

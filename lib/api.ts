@@ -3,17 +3,35 @@ const API_BASE_URL =
 
 export type ApiHealth = { status: string; mode: string };
 export type DemoIncident = { id: string; title: string; description: string; service: string; severity: string; symptoms: string[] };
-export type InvestigationResult = { investigation_id: string | null; incident_id: string; observation: string; actions: string[]; correction: string | null; complete: boolean };
+export type InvestigationEvidence = { id: string; source: string; summary: string; supports: string[]; contradicts: string[] };
+export type InvestigationHypothesis = { id: string; statement: string; confidence: number; status: string; evidence_ids: string[] };
+export type InvestigationResult = {
+  investigation_id: string | null;
+  incident_id: string;
+  observation: string;
+  hypotheses: InvestigationHypothesis[];
+  evidence: InvestigationEvidence[];
+  actions: string[];
+  correction: string | null;
+  complete: boolean;
+  diagnosis: string | null;
+  remediation: string[];
+};
 export type PersistedInvestigation = {
   id: string;
   incident_id: string;
   observation: string;
   scenario: string;
   status: string;
+  hypotheses: InvestigationHypothesis[];
+  evidence: InvestigationEvidence[];
+  retrieved_memory_ids: string[];
   actions: string[];
   action_count: number;
   correction: string | null;
   complete: boolean;
+  diagnosis: string | null;
+  remediation: string[];
   created_at: string;
   completed_at: string | null;
 };

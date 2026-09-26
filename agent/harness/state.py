@@ -11,3 +11,5 @@ class InvestigationState(BaseModel):
     actions: list[str] = Field(default_factory=list)
     correction: str | None = None
     complete: bool = False
+    diagnosis: str | None = None
+    remediation: list[str] = Field(default_factory=list)

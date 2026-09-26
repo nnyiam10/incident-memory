@@ -23,6 +23,8 @@ def save_investigation(state: InvestigationState, scenario: str) -> Investigatio
         action_count=len(state.actions),
         correction=state.correction,
         complete=state.complete,
+        diagnosis=state.diagnosis,
+        remediation=state.remediation,
         created_at=now,
         completed_at=now if state.complete else None,
     )

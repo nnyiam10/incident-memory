@@ -39,6 +39,10 @@ def test_post_investigation_persists_actions(monkeypatch):
     assert saved["complete"] is True
     assert saved["action_count"] == 3
     assert saved["actions"] == response.actions
+    assert len(saved["hypotheses"]) == 3
+    assert len(saved["evidence"]) == 3
+    assert saved["diagnosis"]
+    assert len(saved["remediation"]) == 3
     assert saved["created_at"]
     assert saved["completed_at"]
 
