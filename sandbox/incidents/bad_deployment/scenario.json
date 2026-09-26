@@ -1,0 +1,7 @@
+{
+  "name": "Malformed deployment configuration",
+  "service": "checkout",
+  "logs": ["14:32:08 checkout WARN redis pool wait exceeded 8000ms", "14:32:09 checkout ERROR request timeout trace=tr_842", "14:32:10 payments INFO provider latency=312ms status=200"],
+  "metrics": {"checkout_p95_ms": 8230, "redis_pool_waiters": 47, "payment_provider_p95_ms": 312, "inventory_p95_ms": 81},
+  "deployments": [{"id":"api-7f2c9d","at":"14:29:00","changes":{"REDIS_POOL_SIZE":{"before":40,"after":8}}}]
+}

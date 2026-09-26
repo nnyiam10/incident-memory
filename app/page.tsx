@@ -1,0 +1,60 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { Activity, ArrowUpRight, BrainCircuit, Check, CircleDot, Database, GitCommitHorizontal, Lightbulb, MemoryStick, Search, ShieldCheck, Sparkles, TerminalSquare, X, Zap, ChevronRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+
+const timeline = [
+  { time: '14:32:08', icon: Zap, tone: 'red', title: 'Alert received', detail: 'Checkout p95 latency exceeded 8s after deploy api-7f2c9d.' },
+  { time: '14:32:11', icon: MemoryStick, tone: 'violet', title: 'Retrieved 3 relevant memories', detail: 'Highest match: INC-031 · Redis connection leak · 0.91 similarity' },
+  { time: '14:32:17', icon: GitCommitHorizontal, tone: 'blue', title: 'Compared latest deployment', detail: 'REDIS_POOL_SIZE changed 40 → 8 in checkout production config.' },
+  { time: '14:32:24', icon: TerminalSquare, tone: 'amber', title: 'Tested connection exhaustion', detail: 'Pool waiters climb with traffic; payment provider latency remains nominal.' },
+  { time: '14:32:31', icon: Check, tone: 'green', title: 'Root cause confirmed', detail: 'Malformed deployment config undersized the Redis pool by 80%.' },
+];
+
+const memories = [
+  { type: 'EPISODIC', color: 'violet', score: '91%', title: 'INC-031 · Redis connection leak', body: 'Same timeout signature and checkout-only impact. Pool waiters are the strongest discriminator.', meta: 'Used 4 times · 3 months ago' },
+  { type: 'HUMAN FEEDBACK', color: 'cyan', score: '88%', title: 'Check deploy diffs before provider status', body: 'Maya corrected this assumption: provider errors surface as 502s, not pool-wait timeouts.', meta: 'Confirmed twice · 12 days ago' },
+  { type: 'PROCEDURAL', color: 'amber', score: '83%', title: 'Checkout timeout triage', body: 'Compare latency by dependency, then correlate pool saturation with the latest config changes.', meta: 'Success rate 86% · Used 7 times' },
+];
+
+const hypotheses = [
+  { rank: 1, confidence: 94, title: 'Redis pool undersized by deploy', state: 'confirmed', evidence: 'Config diff + pool waiters + recovery in sandbox' },
+  { rank: 2, confidence: 12, title: 'Payment provider degradation', state: 'ruled out', evidence: 'Provider p95 stable at 312ms; no 5xx increase' },
+  { rank: 3, confidence: 8, title: 'Inventory lock contention', state: 'ruled out', evidence: 'Inventory spans remain below baseline' },
+];
+
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<'investigation' | 'memory' | 'comparison'>('investigation');
+  const [query, setQuery] = useState('Checkout requests started timing out after the latest deploy.');
+  const [running, setRunning] = useState(false);
+  const [scenario, setScenario] = useState<'first' | 'second'>('second');
+  const stats = useMemo(() => scenario === 'first' ? { steps: 11, time: '6m 42s', deadEnds: 3, confidence: 86 } : { steps: 5, time: '2m 18s', deadEnds: 0, confidence: 94 }, [scenario]);
+
+  function startInvestigation() { setRunning(true); window.setTimeout(() => setRunning(false), 1200); }
+
+  return <main className="min-h-screen bg-background text-foreground">
+    <header className="topbar">
+      <div className="brand"><div className="brand-mark"><BrainCircuit size={19} /></div><span>Incident Memory</span><Badge className="beta">BETA</Badge></div>
+      <nav className="topnav" aria-label="Primary">{(['investigation','memory','comparison'] as const).map(tab => <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'active' : ''}>{tab === 'investigation' ? 'Live investigation' : tab}</button>)}</nav>
+      <div className="system"><span className="status-dot" /> Sandbox healthy <span className="divider" /> <Database size={15} /> Atlas connected</div>
+    </header>
+    <section className="alert-strip"><div className="alert-icon"><Activity size={18} /></div><div><p className="eyebrow red">ACTIVE INCIDENT · INC-042</p><h1>Checkout requests timing out after latest deploy</h1></div><div className="alert-meta"><span>SEV-2</span><span>checkout</span><span>14:32 EDT</span></div></section>
+    <section className="command-wrap"><div className="command"><Search size={19} /><input aria-label="Incident description" value={query} onChange={e => setQuery(e.target.value)} /><Button onClick={startInvestigation} className="run-button">{running ? 'Investigating…' : 'Investigate'} <ArrowUpRight size={16} /></Button></div><p><ShieldCheck size={13} /> Read-only diagnostics · fixes run only in sandbox</p></section>
+
+    {activeTab === 'investigation' && <div className="workspace-grid">
+      <section className="panel timeline-panel"><div className="panel-head"><div><p className="eyebrow">LIVE INVESTIGATION</p><h2>Evidence trail</h2></div><span className="live-pill"><span /> Live</span></div><div className="timeline">{timeline.map((item,index) => <div className="timeline-item" key={item.time}><div className={`timeline-icon ${item.tone}`}><item.icon size={16}/></div><div className="timeline-copy"><div><time>{item.time}</time><strong>{item.title}</strong></div><p>{item.detail}</p></div>{index < timeline.length-1 && <div className="timeline-line"/>}</div>)}</div><div className="diagnosis"><div className="diagnosis-title"><Check size={17}/><strong>Evidence-backed diagnosis</strong><Badge>94% confidence</Badge></div><p>Deploy <code>api-7f2c9d</code> reduced <code>REDIS_POOL_SIZE</code> from 40 to 8. Under production traffic, checkout workers exhaust the pool and wait until the 8-second request timeout.</p><div className="remedy"><Lightbulb size={16}/><span><b>Remediation:</b> restore pool size to 40, roll back the config-only change, and add a deploy guard requiring pool size ≥ worker concurrency.</span></div></div></section>
+      <aside className="side-stack"><section className="panel memory-panel"><div className="panel-head"><div><p className="eyebrow">RETRIEVED MEMORY</p><h2>What the team already knows</h2></div><BrainCircuit size={19}/></div><div className="memory-list">{memories.map(m => <article className="memory-card" key={m.title}><div className="memory-label"><span className={m.color}>{m.type}</span><b>{m.score}</b></div><h3>{m.title}</h3><p>{m.body}</p><footer>{m.meta}</footer></article>)}</div></section></aside>
+      <section className="panel hypothesis-panel"><div className="panel-head"><div><p className="eyebrow">REASONING STATE</p><h2>Current hypotheses</h2></div><span className="action-count">5 / 20 actions</span></div><div className="hypothesis-list">{hypotheses.map(h => <article className="hypothesis" key={h.rank}><span className="rank">0{h.rank}</span><div className="hyp-main"><div className="hyp-title"><h3>{h.title}</h3><span className={h.state === 'confirmed' ? 'confirmed':'ruled'}>{h.state === 'confirmed' ? <Check size={12}/> : <X size={12}/>} {h.state}</span></div><p>{h.evidence}</p><Progress value={h.confidence} className={h.state === 'confirmed' ? 'progress-good':'progress-muted'}/></div><strong>{h.confidence}%</strong></article>)}</div></section>
+    </div>}
+    {activeTab === 'memory' && <MemoryView/>}
+    {activeTab === 'comparison' && <Comparison stats={stats} scenario={scenario} setScenario={setScenario}/>} 
+    <footer className="page-footer"><span><CircleDot size={13}/> Investigation checkpoint saved</span><span>MongoDB Atlas · agent harness v0.3.1</span></footer>
+  </main>;
+}
+
+function MemoryView() { return <section className="memory-page"><div className="memory-hero"><p className="eyebrow">ORGANIZATIONAL MEMORY</p><h2>Not a transcript archive. A system that revises what it knows.</h2><p>Every memory carries provenance, confidence, usage, and contradiction history.</p></div><div className="memory-types">{[['Episodic','What happened','12','Individual incidents with symptoms, evidence, root causes, and fixes.'],['Semantic','What is true','28','Stable facts about services, dependencies, and failure signatures.'],['Procedural','What works','9','Reusable debugging strategies promoted from successful investigations.'],['Negative','What failed','17','Dead ends and the evidence that ruled them out.'],['Human feedback','What the team taught it','6','Corrections, preferences, and local operational knowledge.']].map(([title,kicker,count,body]) => <article key={title}><div><MemoryStick size={18}/><span>{count}</span></div><p>{kicker}</p><h3>{title}</h3><p>{body}</p><button>Explore memories <ChevronRight size={14}/></button></article>)}</div></section>; }
+
+function Comparison({stats,scenario,setScenario}:{stats:{steps:number;time:string;deadEnds:number;confidence:number};scenario:'first'|'second';setScenario:(s:'first'|'second')=>void}) { return <section className="comparison-page"><div className="comparison-head"><div><p className="eyebrow">MEMORY PAYOFF</p><h2>The second incident is where the agent proves it learned.</h2></div><div className="segmented"><button className={scenario==='first'?'active':''} onClick={()=>setScenario('first')}>First incident</button><button className={scenario==='second'?'active':''} onClick={()=>setScenario('second')}>Second incident</button></div></div><div className="metric-grid">{[['Investigation steps',String(stats.steps),'11 → 5'],['Time to diagnosis',stats.time,'66% faster'],['Dead ends',String(stats.deadEnds),'3 → 0'],['Final confidence',`${stats.confidence}%`,'+8 points']].map(([label,value,delta]) => <article key={label}><p>{label}</p><strong>{value}</strong><span>{delta}</span></article>)}</div><div className="learning-card"><div className="spark"><Sparkles size={21}/></div><div><p className="eyebrow">CORRECTION REMEMBERED</p><h3>“Payment provider failures appear as 502s, not pool-wait timeouts.”</h3><p>The second investigation used Maya’s correction to skip the provider-status dead end and inspect deployment configuration first.</p></div><Badge>Applied automatically</Badge></div></section>; }

@@ -1,0 +1,17 @@
+services:
+  mongodb:
+    image: mongodb/mongodb-atlas-local:8.0
+    ports: ["27017:27017"]
+    volumes: ["atlas_data:/data/db"]
+  api:
+    build: .
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DATABASE: incident_memory
+    ports: ["8000:8000"]
+    volumes: [".:/app"]
+    depends_on: [mongodb]
+volumes:
+  atlas_data:
+

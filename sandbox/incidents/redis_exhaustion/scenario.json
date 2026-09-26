@@ -1,0 +1,1 @@
+{"name":"Redis connection exhaustion","service":"checkout","logs":["checkout WARN redis clients=40 max=40","checkout ERROR pool exhausted"],"metrics":{"redis_pool_waiters":63,"checkout_p95_ms":9100},"deployments":[]}

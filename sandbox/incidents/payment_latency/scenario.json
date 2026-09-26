@@ -1,0 +1,2 @@
+{"name":"Slow external payment API","service":"payments","logs":["payments WARN provider latency=7800ms","checkout ERROR upstream timeout status=502"],"metrics":{"payment_provider_p95_ms":7800,"provider_5xx":41},"deployments":[]}
+
