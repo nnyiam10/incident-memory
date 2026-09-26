@@ -11,6 +11,18 @@ def service_for_investigation(investigation: Investigation) -> str:
     return "payments" if investigation.scenario == "payment_latency" else "checkout"
 
 
+def save_memories(memories: list[Memory]) -> list[Memory]:
+    if not memories:
+        return []
+    documents = [memory.model_dump(mode="json") for memory in memories]
+    vectors = embed_texts([memory_text(document) for document in documents])
+    for document, vector in zip(documents, vectors, strict=True):
+        document["embedding"] = vector
+        document["embedding_model"] = EMBEDDING_MODEL
+    database().memories.insert_many(documents)
+    return memories
+
+
 def save_human_feedback(investigation: Investigation, correction: str, author: str = "human") -> Memory:
     memory = Memory(
         id=f"{investigation.incident_id}:feedback:{uuid4().hex[:10]}",
@@ -26,8 +38,5 @@ def save_human_feedback(investigation: Investigation, correction: str, author: s
             author=author,
         ),
     )
-    document = memory.model_dump(mode="json")
-    document["embedding"] = embed_texts([memory_text(document)])[0]
-    document["embedding_model"] = EMBEDDING_MODEL
-    database().memories.insert_one(document)
+    save_memories([memory])
     return memory

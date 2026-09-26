@@ -374,6 +374,10 @@ export default function Home() {
                       : 'No remediation has been proposed.'}
                   </span>
                 </div>
+                <div className="consolidation-status">
+                  <MemoryStick size={14} />
+                  <span><b>{result.consolidated_memory_ids?.length ?? 0} durable memories created</b> · embedded through OpenRouter and indexed in Atlas</span>
+                </div>
               </div>
             )}
             {result?.complete && (

@@ -11,6 +11,7 @@ export type InvestigationResult = {
   observation: string;
   hypotheses: InvestigationHypothesis[];
   evidence: InvestigationEvidence[];
+  consolidated_memory_ids: string[];
   actions: string[];
   correction: string | null;
   correction_memory_ids?: string[];
@@ -29,6 +30,7 @@ export type PersistedInvestigation = {
   hypotheses: InvestigationHypothesis[];
   evidence: InvestigationEvidence[];
   retrieved_memory_ids: string[];
+  consolidated_memory_ids: string[];
   actions: string[];
   action_count: number;
   correction: string | null;

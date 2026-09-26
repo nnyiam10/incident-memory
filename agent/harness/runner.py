@@ -31,7 +31,7 @@ def _fallback_conclusion(scenario: str, evidence_ids: list[str]) -> tuple[list[H
 
 def investigate(incident_id: str, observation: str, scenario: str = "auto", correction: str | None = None) -> InvestigationState:
     resolved_scenario = infer_scenario(observation) if scenario == "auto" else scenario
-    state = InvestigationState(incident_id=incident_id, observation=observation, correction=correction, reasoning_model=REASONING_MODEL)
+    state = InvestigationState(incident_id=incident_id, observation=observation, scenario=resolved_scenario, correction=correction, reasoning_model=REASONING_MODEL)
     budget, completed_tools, last_decision, planner_failed = Budget(), [], None, False
 
     while budget.allows(len(state.actions)):

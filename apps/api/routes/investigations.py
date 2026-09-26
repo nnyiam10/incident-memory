@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from agent.harness.runner import investigate
-from database.investigations import attach_correction, get_investigation, list_investigations, save_investigation
-from database.memories import save_human_feedback
+from agent.memory.consolidation import consolidate_investigation
+from database.investigations import attach_consolidated_memories, attach_correction, get_investigation, list_investigations, save_investigation
+from database.memories import save_human_feedback, save_memories
 from database.schemas.investigation import Investigation
 router = APIRouter()
 
@@ -28,6 +29,10 @@ def start(request: StartRequest):
     state = investigate(**request.model_dump())
     saved = save_investigation(state, scenario=request.scenario)
     state.investigation_id = saved.id
+    if saved.complete:
+        memories = save_memories(consolidate_investigation(saved))
+        state.consolidated_memory_ids = [memory.id for memory in memories]
+        attach_consolidated_memories(saved.id, state.consolidated_memory_ids)
     return state
 
 @router.get("", response_model=list[Investigation])

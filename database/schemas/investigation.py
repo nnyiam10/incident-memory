@@ -24,6 +24,7 @@ class Investigation(BaseModel):
     hypotheses: list[Hypothesis] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     retrieved_memory_ids: list[str] = Field(default_factory=list)
+    consolidated_memory_ids: list[str] = Field(default_factory=list)
     actions: list[str] = Field(default_factory=list)
     action_count: int = 0
     correction: str | None = None

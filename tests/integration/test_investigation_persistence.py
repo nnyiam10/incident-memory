@@ -28,6 +28,8 @@ def test_post_investigation_persists_actions(monkeypatch):
         "agent.harness.runner.choose_next_action",
         lambda *args: (_ for _ in ()).throw(RuntimeError("offline test")),
     )
+    monkeypatch.setattr(investigations, "save_memories", lambda memories: memories)
+    monkeypatch.setattr(investigations, "attach_consolidated_memories", lambda *args: None)
 
     response = investigations.start(
         investigations.StartRequest(
@@ -48,6 +50,7 @@ def test_post_investigation_persists_actions(monkeypatch):
     assert len(saved["evidence"]) == 3
     assert saved["diagnosis"]
     assert len(saved["remediation"]) >= 1
+    assert len(response.consolidated_memory_ids) >= 2
     assert saved["created_at"]
     assert saved["completed_at"]
 

@@ -6,8 +6,8 @@ class FakeCollection:
     def __init__(self):
         self.document = None
 
-    def insert_one(self, document):
-        self.document = document
+    def insert_many(self, documents):
+        self.document = documents[0]
 
 
 class FakeDatabase:
