@@ -61,6 +61,21 @@ const toolPresentation = {
   },
 } as const;
 
+function humanizeIdentifier(value: string) {
+  return value
+    .replaceAll('_', ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function humanizeCopy(value: string) {
+  return value
+    .replaceAll('REDIS_POOL_SIZE', 'Redis pool size')
+    .replaceAll('redis_pool_waiters', 'Redis pool waiters')
+    .replaceAll('checkout_p95_ms', 'Checkout p95 latency')
+    .replaceAll('payment_provider_p95_ms', 'Payment provider p95 latency')
+    .replaceAll('inventory_p95_ms', 'Inventory p95 latency');
+}
+
 function timelineFromResult(result: InvestigationResult) {
   const start = [
     {
@@ -78,12 +93,12 @@ function timelineFromResult(result: InvestigationResult) {
     ] ?? {
       icon: TerminalSquare,
       tone: 'blue',
-      title: tool.replaceAll('_', ' '),
+      title: humanizeIdentifier(tool),
     };
     return {
       time: `+${index + 1}s`,
       ...presentation,
-      detail: detail.join(': '),
+      detail: humanizeCopy(detail.join(': ')),
     };
   });
   const finish = result.complete
@@ -416,16 +431,16 @@ export default function Home() {
                   <Badge className="harness-badge">Harness {result.harness_version}</Badge>
                 </div>
                 <p>
-                  {result.diagnosis ??
-                    'The diagnostic pass completed without a confirmed root cause.'}
+                  {humanizeCopy(result.diagnosis ??
+                    'The diagnostic pass completed without a confirmed root cause.')}
                 </p>
                 <div className="remedy">
                   <Lightbulb size={16} />
                   <span>
                     <b>Remediation plan:</b>{' '}
-                    {result.remediation.length
+                    {humanizeCopy(result.remediation.length
                       ? result.remediation.join(' ')
-                      : 'No remediation has been proposed.'}
+                      : 'No remediation has been proposed.')}
                   </span>
                 </div>
                 <div className="consolidation-status">
@@ -452,7 +467,7 @@ export default function Home() {
                   <>
                     <textarea aria-label="Human correction" value={correctionText} onChange={(event) => setCorrectionText(event.target.value)} placeholder="Example: Provider failures appear as 502s; Redis pool waits indicate connection exhaustion." rows={3} />
                     <div className="correction-actions">
-                      <span>Saved as human_feedback with investigation provenance</span>
+                      <span>Saved as Human Feedback with investigation provenance</span>
                       <Button onClick={saveCorrection} disabled={!correctionText.trim() || savingCorrection}>{savingCorrection ? 'Learning…' : 'Save correction'}</Button>
                     </div>
                     {correctionError && <p className="correction-error" role="alert">{correctionError}</p>}
@@ -511,13 +526,13 @@ export default function Home() {
                       </span>
                       <div className="hyp-main">
                         <div className="hyp-title">
-                          <h3>{hypothesis.statement}</h3>
+                          <h3>{humanizeCopy(hypothesis.statement)}</h3>
                           <span className={confirmed ? 'confirmed' : 'ruled'}>
                             {confirmed ? <Check size={12} /> : <X size={12} />}{' '}
-                            {hypothesis.status.replaceAll('_', ' ')}
+                            {humanizeIdentifier(hypothesis.status)}
                           </span>
                         </div>
-                        <p>{evidence || 'No linked evidence was recorded.'}</p>
+                        <p>{humanizeCopy(evidence || 'No linked evidence was recorded.')}</p>
                         <Progress
                           value={confidence}
                           className={
@@ -629,20 +644,21 @@ function HarnessView({ versions, evaluations, busy, error, onCreate, onEvaluate,
   const [withFeedback, setWithFeedback] = useState(2);
   const [memoryLimit, setMemoryLimit] = useState(3);
   const [maxActions, setMaxActions] = useState(20);
+  const [toolOrderPolicy, setToolOrderPolicy] = useState('memory_guided_first');
 
   useEffect(() => { if (active) { setVersion(nextVersion(active.version)); setWithoutMemory(active.minimum_evidence_without_memory); setWithFeedback(active.minimum_evidence_with_feedback); setMemoryLimit(active.context_policy.limit); setMaxActions(active.max_actions); } }, [active?.version]);
 
   async function create() {
     if (!active) return;
-    await onCreate({ version, reasoning_model: active.reasoning_model, allowed_tools: active.allowed_tools, tool_order_policy: 'memory_guided_first', context_policy: { ...active.context_policy, limit: memoryLimit }, minimum_evidence_without_memory: withoutMemory, minimum_evidence_with_feedback: withFeedback, max_actions: maxActions, parent_version: active.version, created_by: 'human' });
+    await onCreate({ version, reasoning_model: active.reasoning_model, allowed_tools: active.allowed_tools, tool_order_policy: toolOrderPolicy, context_policy: { ...active.context_policy, limit: memoryLimit }, minimum_evidence_without_memory: withoutMemory, minimum_evidence_with_feedback: withFeedback, max_actions: maxActions, parent_version: active.version, created_by: 'human' });
     setShowForm(false);
   }
 
   return <section className="harness-page">
     <div className="harness-head"><div><p className="eyebrow">AGENT OPERATING STRATEGY</p><h2>Harness versions</h2><p>Memory stays global. Versions control how the agent selects tools, assembles context, and decides when evidence is sufficient.</p></div><Button onClick={() => setShowForm(!showForm)} disabled={!active || busy}><Plus size={14}/> New candidate</Button></div>
     {error && <div className="api-error" role="alert"><X size={14}/><span>{error}</span></div>}
-    {showForm && active && <div className="candidate-form"><div className="candidate-title"><GitBranch size={18}/><div><strong>Fork candidate from {active.version}</strong><p>Only strategy configuration is copied; organizational memory remains shared.</p></div></div><div className="config-grid"><label>Version<input value={version} onChange={(event) => setVersion(event.target.value)}/></label><label>Tool-order policy<select value="memory_guided_first" disabled><option>memory_guided_first</option></select></label><label>Evidence without memory<input type="number" min="1" max="3" value={withoutMemory} onChange={(event) => setWithoutMemory(Number(event.target.value))}/></label><label>Evidence with feedback<input type="number" min="1" max="3" value={withFeedback} onChange={(event) => setWithFeedback(Number(event.target.value))}/></label><label>Memory retrieval limit<input type="number" min="1" max="10" value={memoryLimit} onChange={(event) => setMemoryLimit(Number(event.target.value))}/></label><label>Maximum actions<input type="number" min="1" max="20" value={maxActions} onChange={(event) => setMaxActions(Number(event.target.value))}/></label></div><div className="candidate-footer"><span>Allowed tools: {active.allowed_tools.join(', ')}</span><Button onClick={create} disabled={!version.trim() || busy}>{busy ? 'Creating…' : 'Create candidate'}</Button></div></div>}
-    <div className="version-list">{busy && !versions.length ? <div className="harness-empty">Loading harness versions…</div> : versions.map((item) => { const evaluation = evaluations[item.version]; return <article className={`version-card ${item.status}`} key={item.version}><div className="version-title"><div className="version-icon"><Settings2 size={18}/></div><div><h3>{item.version}</h3><p>{item.parent_version ? `Forked from ${item.parent_version}` : 'Initial production strategy'}</p></div><Badge>{item.status}</Badge></div><dl><div><dt>Tool order</dt><dd>{item.tool_order_policy}</dd></div><div><dt>Evidence threshold</dt><dd>{item.minimum_evidence_without_memory} standard · {item.minimum_evidence_with_feedback} with feedback</dd></div><div><dt>Memory context</dt><dd>{item.context_policy.limit} results · {item.context_policy.types.join(', ')}</dd></div><div><dt>Action budget</dt><dd>{item.max_actions}</dd></div><div><dt>Model</dt><dd>{item.reasoning_model}</dd></div></dl>{evaluation && <div className={`evaluation-result ${evaluation.passed ? 'passed' : 'failed'}`}><strong>{evaluation.passed ? 'Evaluation passed' : 'Evaluation failed'}</strong><span>Accuracy {Math.round(evaluation.baseline.accuracy * 100)}% → {Math.round(evaluation.candidate.accuracy * 100)}%</span><span>Actions {evaluation.baseline.total_actions} → {evaluation.candidate.total_actions}</span><span>Time {(evaluation.baseline.total_duration_ms / 1000).toFixed(1)}s → {(evaluation.candidate.total_duration_ms / 1000).toFixed(1)}s</span>{evaluation.reasons.map((reason) => <small key={reason}>{reason}</small>)}</div>}<footer><span>Created by {item.created_by}{item.promoted_by ? ` · promoted by ${item.promoted_by}` : ''} · evaluation {item.evaluation_status.replaceAll('_', ' ')}</span>{item.status === 'candidate' && <div className="version-buttons"><Button onClick={() => onEvaluate(item.version)} disabled={busy}>{busy ? 'Evaluating…' : 'Run evaluation'}</Button><Button onClick={() => onPromote(item.version)} disabled={busy || item.evaluation_status !== 'passed'}>Promote candidate</Button></div>}</footer></article>; })}</div>
+    {showForm && active && <div className="candidate-form"><div className="candidate-title"><GitBranch size={18}/><div><strong>Fork candidate from {active.version}</strong><p>Only strategy configuration is copied; organizational memory remains shared.</p></div></div><div className="config-grid"><label>Version<input value={version} onChange={(event) => setVersion(event.target.value)}/></label><label>Tool-order policy<select value={toolOrderPolicy} onChange={(event) => setToolOrderPolicy(event.target.value)}><option value="symptom_discriminator_first">Symptom Discriminator First</option><option value="memory_guided_first">Memory Guided First</option></select></label><label>Evidence without memory<input type="number" min="1" max="3" value={withoutMemory} onChange={(event) => setWithoutMemory(Number(event.target.value))}/></label><label>Evidence with feedback<input type="number" min="1" max="3" value={withFeedback} onChange={(event) => setWithFeedback(Number(event.target.value))}/></label><label>Memory retrieval limit<input type="number" min="1" max="10" value={memoryLimit} onChange={(event) => setMemoryLimit(Number(event.target.value))}/></label><label>Maximum actions<input type="number" min="1" max="20" value={maxActions} onChange={(event) => setMaxActions(Number(event.target.value))}/></label></div><div className="candidate-footer"><span>Allowed tools: {active.allowed_tools.map(humanizeIdentifier).join(', ')}</span><Button onClick={create} disabled={!version.trim() || busy}>{busy ? 'Creating…' : 'Create candidate'}</Button></div></div>}
+    <div className="version-list">{busy && !versions.length ? <div className="harness-empty">Loading harness versions…</div> : versions.map((item) => { const evaluation = evaluations[item.version]; return <article className={`version-card ${item.status}`} key={item.version}><div className="version-title"><div className="version-icon"><Settings2 size={18}/></div><div><h3>{item.version}</h3><p>{item.parent_version ? `Forked from ${item.parent_version}` : 'Initial production strategy'}</p></div><Badge>{humanizeIdentifier(item.status)}</Badge></div><dl><div><dt>Tool order</dt><dd>{humanizeIdentifier(item.tool_order_policy)}</dd></div><div><dt>Evidence threshold</dt><dd>{item.minimum_evidence_without_memory} standard · {item.minimum_evidence_with_feedback} with feedback</dd></div><div><dt>Memory context</dt><dd>{item.context_policy.limit} results · {item.context_policy.types.map(humanizeIdentifier).join(', ')}</dd></div><div><dt>Action budget</dt><dd>{item.max_actions}</dd></div><div><dt>Model</dt><dd>{item.reasoning_model}</dd></div></dl>{evaluation && <div className={`evaluation-result ${evaluation.passed ? 'passed' : 'failed'}`}><strong>{evaluation.passed ? 'Evaluation passed' : 'Evaluation failed'}</strong><span>Accuracy {Math.round(evaluation.baseline.accuracy * 100)}% → {Math.round(evaluation.candidate.accuracy * 100)}%</span><span>Actions {evaluation.baseline.total_actions} → {evaluation.candidate.total_actions}</span><span>Time {(evaluation.baseline.total_duration_ms / 1000).toFixed(1)}s → {(evaluation.candidate.total_duration_ms / 1000).toFixed(1)}s</span>{evaluation.reasons.map((reason) => <small key={reason}>{reason}</small>)}</div>}<footer><span>Created by {humanizeIdentifier(item.created_by)}{item.promoted_by ? ` · promoted by ${humanizeIdentifier(item.promoted_by)}` : ''} · evaluation {humanizeIdentifier(item.evaluation_status)}</span>{item.status === 'candidate' && <div className="version-buttons"><Button onClick={() => onEvaluate(item.version)} disabled={busy}>{busy ? 'Evaluating…' : 'Run evaluation'}</Button><Button onClick={() => onPromote(item.version)} disabled={busy || item.evaluation_status !== 'passed'}>Promote candidate</Button></div>}</footer></article>; })}</div>
   </section>;
 }
 
