@@ -22,6 +22,8 @@ npm run dev
 
 Open the local URL printed by the command. The dashboard works immediately with representative demo state.
 
+Runtime model calls use the hackathon's OpenRouter credits through its OpenAI-compatible API. Set `OPENROUTER_API_KEY` in `.env`; never expose it to the frontend or commit it.
+
 For the API and MongoDB-backed flow:
 
 ```bash
@@ -70,5 +72,4 @@ The agent may search logs and code, query metrics and deployments, and run tests
 
 ## Next production steps
 
-Create the Atlas `memory_vector` index, replace simulated tools with read-only observability adapters, stream investigation events from the worker, and wire the dashboard to the API. Keep the same schemas and safety boundary.
-
+Generate the seed-memory embeddings through OpenRouter, persist investigations in Atlas, replace simulated tools with read-only observability adapters, and stream investigation events to the dashboard. Keep the same schemas and safety boundary.

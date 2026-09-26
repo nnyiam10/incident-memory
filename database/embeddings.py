@@ -1,11 +1,7 @@
-import os
-
-from openai import OpenAI
 from pymongo import UpdateOne
 
+from agent.policies.models import EMBEDDING_MODEL, model_client
 from database.mongodb import database
-
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 
 def memory_text(memory: dict) -> str:
@@ -24,7 +20,7 @@ def memory_text(memory: dict) -> str:
 def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
-    response = OpenAI().embeddings.create(model=EMBEDDING_MODEL, input=texts)
+    response = model_client().embeddings.create(model=EMBEDDING_MODEL, input=texts)
     return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]
 
 
