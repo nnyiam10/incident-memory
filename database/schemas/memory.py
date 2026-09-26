@@ -12,6 +12,7 @@ class MemoryType(StrEnum):
 class Provenance(BaseModel):
     incident_id: str
     investigation_id: str | None = None
+    harness_version: str | None = None
     evidence_ids: list[str] = Field(default_factory=list)
     author: str = "agent"
 

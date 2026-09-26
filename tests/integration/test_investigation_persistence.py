@@ -1,6 +1,7 @@
 from apps.api.routes import investigations
 from database.schemas.investigation import Investigation
 from database.schemas.memory import Memory, MemoryType, Provenance
+from database.harness_versions import default_harness_version
 
 
 class InsertResult:
@@ -30,6 +31,7 @@ def test_post_investigation_persists_actions(monkeypatch):
     )
     monkeypatch.setattr(investigations, "save_memories", lambda memories: memories)
     monkeypatch.setattr(investigations, "attach_consolidated_memories", lambda *args: None)
+    monkeypatch.setattr(investigations, "get_active_harness_version", default_harness_version)
 
     response = investigations.start(
         investigations.StartRequest(
@@ -53,6 +55,8 @@ def test_post_investigation_persists_actions(monkeypatch):
     assert len(response.consolidated_memory_ids) >= 2
     assert saved["created_at"]
     assert saved["completed_at"]
+    assert saved["harness_version"] == "v0.4.0"
+    assert saved["harness_config"]["tool_order_policy"] == "symptom_discriminator_first"
 
 
 def saved_investigation():

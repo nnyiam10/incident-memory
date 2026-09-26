@@ -34,6 +34,7 @@ def save_human_feedback(investigation: Investigation, correction: str, author: s
         provenance=Provenance(
             incident_id=investigation.incident_id,
             investigation_id=investigation.id,
+            harness_version=investigation.harness_version,
             evidence_ids=[item.id for item in investigation.evidence],
             author=author,
         ),

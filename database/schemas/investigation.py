@@ -37,5 +37,7 @@ class Investigation(BaseModel):
     reasoning_model: str | None = None
     duration_ms: int = 0
     dead_end_count: int = 0
+    harness_version: str = "unversioned"
+    harness_config: dict = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None

@@ -25,6 +25,7 @@ def consolidate_investigation(investigation: Investigation) -> list[Memory]:
     provenance = Provenance(
         incident_id=investigation.incident_id,
         investigation_id=investigation.id,
+        harness_version=investigation.harness_version,
         evidence_ids=all_evidence_ids,
     )
     remediation = " ".join(investigation.remediation) or "No remediation was proposed."
@@ -65,6 +66,7 @@ def consolidate_investigation(investigation: Investigation) -> list[Memory]:
                 provenance=Provenance(
                     incident_id=investigation.incident_id,
                     investigation_id=investigation.id,
+                    harness_version=investigation.harness_version,
                     evidence_ids=evidence_ids,
                 ),
             )

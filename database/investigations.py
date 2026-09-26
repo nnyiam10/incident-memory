@@ -30,6 +30,8 @@ def save_investigation(state: InvestigationState, scenario: str) -> Investigatio
         reasoning_model=state.reasoning_model,
         duration_ms=state.duration_ms,
         dead_end_count=state.dead_end_count,
+        harness_version=state.harness_version,
+        harness_config=state.harness_config,
         created_at=now,
         completed_at=now if state.complete else None,
     )

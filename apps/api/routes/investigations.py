@@ -5,6 +5,7 @@ from agent.memory.retrieval import retrieve_feedback_for_investigation
 from agent.memory.consolidation import consolidate_investigation
 from database.investigations import attach_consolidated_memories, attach_correction, get_investigation, list_investigations, save_investigation
 from database.memories import save_human_feedback, save_memories
+from database.harness_versions import get_active_harness_version
 from database.schemas.investigation import Investigation
 router = APIRouter()
 
@@ -29,14 +30,15 @@ class CorrectionResponse(BaseModel):
 @router.post("")
 def start(request: StartRequest):
     payload = request.model_dump()
+    harness = get_active_harness_version()
     retrieved_feedback = []
     if request.baseline_investigation_id:
         scenario = infer_scenario(request.observation) if request.scenario == "auto" else request.scenario
         service = "payments" if scenario == "payment_latency" else "checkout"
-        retrieved_feedback = retrieve_feedback_for_investigation(request.observation, service, request.baseline_investigation_id)
+        retrieved_feedback = retrieve_feedback_for_investigation(request.observation, service, request.baseline_investigation_id, limit=harness.context_policy.limit)
         if retrieved_feedback:
             payload["correction"] = "\n".join(memory["content"] for memory in retrieved_feedback)
-    state = investigate(**payload)
+    state = investigate(**payload, harness=harness)
     state.memories = retrieved_feedback
     state.correction = request.correction
     saved = save_investigation(state, scenario=request.scenario)

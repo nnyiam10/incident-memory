@@ -1,5 +1,6 @@
 from agent.harness.planner import PlannerDecision, PlannedHypothesis
 from agent.harness.runner import infer_scenario, investigate
+from database.harness_versions import default_harness_version
 
 def scripted_planner(actions):
     sequence = iter(actions)
@@ -29,6 +30,14 @@ def test_incident_description_selects_different_simulated_evidence():
     assert infer_scenario("Redis connection pool is exhausted") == "redis_exhaustion"
     assert infer_scenario("Pool-wait warnings with no 502 responses") == "redis_exhaustion"
     assert infer_scenario("Timeouts began after latest deploy") == "bad_deployment"
+
+def test_investigation_records_immutable_harness_snapshot(monkeypatch):
+    monkeypatch.setattr("agent.harness.runner.choose_next_action", scripted_planner(["query_metrics", "search_logs", "get_deployments", None]))
+    harness = default_harness_version()
+    result = investigate("INC-VERSION", "checkout timeouts", harness=harness)
+    assert result.harness_version == harness.version
+    assert result.harness_config["allowed_tools"] == harness.allowed_tools
+    assert result.harness_config["context_policy"]["types"] == ["human_feedback", "procedural", "negative"]
 
 def test_repeated_model_action_is_rejected(monkeypatch):
     monkeypatch.setattr("agent.harness.runner.choose_next_action", scripted_planner(["query_metrics", "query_metrics"]))

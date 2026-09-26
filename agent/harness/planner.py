@@ -29,7 +29,7 @@ On the first turn, follow the supplied triage hint; it encodes the symptom-speci
 Never invent results. Conclusions must cite supplied evidence IDs. Require two independent evidence sources.
 Production changes are forbidden; remediation is advice only."""
 
-def choose_next_action(observation: str, evidence: list[dict], completed_actions: list[str], allowed_actions: list[str], correction: str | None = None) -> PlannerDecision:
+def choose_next_action(observation: str, evidence: list[dict], completed_actions: list[str], allowed_actions: list[str], correction: str | None = None, tool_order_policy: str = "symptom_discriminator_first", context_policy: dict | None = None) -> PlannerDecision:
     text = observation.lower()
     triage_hint = (
         "Start with search_logs because explicit 502 or upstream errors are the strongest discriminator."
@@ -38,7 +38,7 @@ def choose_next_action(observation: str, evidence: list[dict], completed_actions
         if any(term in text for term in ("deploy", "release", "config"))
         else "Start with query_metrics to identify which dependency or resource is saturated."
     )
-    payload = {"incident_observation": observation, "human_correction": correction, "minimum_evidence_sources": 2 if correction else 3, "triage_hint": triage_hint, "allowed_actions": allowed_actions, "completed_actions": completed_actions, "evidence": evidence}
+    payload = {"incident_observation": observation, "human_correction": correction, "tool_order_policy": tool_order_policy, "context_policy": context_policy or {}, "minimum_evidence_sources": 2 if correction else 3, "triage_hint": triage_hint, "allowed_actions": allowed_actions, "completed_actions": completed_actions, "evidence": evidence}
     completion = model_client().chat.completions.create(
         model=REASONING_MODEL,
         messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": json.dumps(payload)}],

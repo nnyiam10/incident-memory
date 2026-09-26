@@ -25,6 +25,8 @@ export type InvestigationResult = {
   reasoning_model: string | null;
   duration_ms: number;
   dead_end_count: number;
+  harness_version: string;
+  harness_config: Record<string, unknown>;
 };
 export type PersistedInvestigation = {
   id: string;
@@ -48,6 +50,8 @@ export type PersistedInvestigation = {
   reasoning_model: string | null;
   duration_ms: number;
   dead_end_count: number;
+  harness_version: string;
+  harness_config: Record<string, unknown>;
   created_at: string;
   completed_at: string | null;
 };
@@ -81,4 +85,37 @@ export function submitCorrection(investigationId: string, correction: string): P
     method: 'POST',
     body: JSON.stringify({ correction, author: 'human' }),
   });
+}
+
+export type HarnessVersion = {
+  version: string;
+  status: 'active' | 'candidate' | 'retired';
+  reasoning_model: string;
+  allowed_tools: string[];
+  tool_order_policy: string;
+  context_policy: { types: string[]; limit: number; minimum_score: number; baseline_feedback_only: boolean };
+  minimum_evidence_without_memory: number;
+  minimum_evidence_with_feedback: number;
+  max_actions: number;
+  parent_version: string | null;
+  created_by: string;
+  promoted_by: string | null;
+  evaluation_status: 'not_run' | 'running' | 'passed' | 'failed';
+  latest_evaluation_id: string | null;
+  created_at: string;
+  promoted_at: string | null;
+};
+export type CreateHarnessCandidate = Omit<HarnessVersion, 'status' | 'promoted_by' | 'created_at' | 'promoted_at'>;
+export function getHarnessVersions(): Promise<HarnessVersion[]> { return request('/harnesses'); }
+export function createHarnessCandidate(candidate: CreateHarnessCandidate): Promise<HarnessVersion> {
+  return request('/harnesses', { method: 'POST', body: JSON.stringify(candidate) });
+}
+export function promoteHarnessVersion(version: string): Promise<HarnessVersion> {
+  return request(`/harnesses/${encodeURIComponent(version)}/promote`, { method: 'POST', body: JSON.stringify({ confirmed: true, approved_by: 'human' }) });
+}
+export type EvaluationCase = { scenario: string; observation: string; expected_terms: string[]; diagnosis: string; accurate: boolean; action_count: number; duration_ms: number };
+export type EvaluationMetrics = { version: string; accuracy: number; total_actions: number; total_duration_ms: number; cases: EvaluationCase[] };
+export type HarnessEvaluation = { id: string; active_version: string; candidate_version: string; baseline: EvaluationMetrics; candidate: EvaluationMetrics; passed: boolean; reasons: string[]; created_at: string };
+export function runHarnessEvaluation(version: string): Promise<HarnessEvaluation> {
+  return request(`/evaluations/harnesses/${encodeURIComponent(version)}`, { method: 'POST' });
 }

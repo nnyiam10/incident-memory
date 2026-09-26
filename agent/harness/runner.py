@@ -3,9 +3,10 @@ from agent.harness.budget import Budget
 from agent.harness.planner import PlannerDecision, choose_next_action
 from agent.harness.state import InvestigationState
 from agent.policies.guardrails import authorize
-from agent.policies.models import REASONING_MODEL
 from agent.tools.simulated import get_deployments, query_metrics, search_logs
 from database.schemas.investigation import Evidence, Hypothesis
+from database.harness_versions import default_harness_version
+from database.schemas.harness_version import HarnessVersion
 
 EXECUTABLE_TOOLS = {"get_deployments": get_deployments, "query_metrics": query_metrics, "search_logs": search_logs}
 
@@ -31,18 +32,19 @@ def _fallback_conclusion(scenario: str, evidence_ids: list[str]) -> tuple[list[H
         return [Hypothesis(id="HYP-1", statement="Checkout is exhausting its Redis connections", confidence=.95, status="confirmed", evidence_ids=evidence_ids)], "Checkout reached its Redis client limit, exhausting the connection pool and delaying requests.", ["Validate connection cleanup in the sandbox and propose a bounded pool or client-lifecycle fix."]
     return [Hypothesis(id="HYP-1", statement="The latest deploy undersized the checkout Redis connection pool", confidence=.94, status="confirmed", evidence_ids=evidence_ids)], "The latest deployment reduced the Redis pool from 40 to 8, so checkout exhausts it under load.", ["Restore the prior pool size in the sandbox, validate recovery, then propose rollback and a deployment guard."]
 
-def investigate(incident_id: str, observation: str, scenario: str = "auto", correction: str | None = None, baseline_investigation_id: str | None = None) -> InvestigationState:
+def investigate(incident_id: str, observation: str, scenario: str = "auto", correction: str | None = None, baseline_investigation_id: str | None = None, harness: HarnessVersion | None = None) -> InvestigationState:
     started_at = perf_counter()
+    harness = harness or default_harness_version()
     resolved_scenario = infer_scenario(observation) if scenario == "auto" else scenario
-    state = InvestigationState(incident_id=incident_id, observation=observation, scenario=resolved_scenario, correction=correction, baseline_investigation_id=baseline_investigation_id, reasoning_model=REASONING_MODEL)
-    budget, completed_tools, last_decision, planner_failed = Budget(), [], None, False
-    minimum_evidence = 2 if correction else 3
+    state = InvestigationState(incident_id=incident_id, observation=observation, scenario=resolved_scenario, correction=correction, baseline_investigation_id=baseline_investigation_id, reasoning_model=harness.reasoning_model, harness_version=harness.version, harness_config=harness.model_dump(mode="json"))
+    budget, completed_tools, last_decision, planner_failed = Budget(max_actions=harness.max_actions), [], None, False
+    minimum_evidence = harness.minimum_evidence_with_feedback if correction else harness.minimum_evidence_without_memory
 
     while budget.allows(len(state.actions)):
-        remaining = [name for name in EXECUTABLE_TOOLS if name not in completed_tools]
+        remaining = [name for name in harness.allowed_tools if name in EXECUTABLE_TOOLS and name not in completed_tools]
         evidence_payload = [item.model_dump() for item in state.evidence]
         try:
-            decision = choose_next_action(observation, evidence_payload, completed_tools, remaining, correction)
+            decision = choose_next_action(observation, evidence_payload, completed_tools, remaining, correction, harness.tool_order_policy, harness.context_policy.model_dump())
         except Exception:
             planner_failed = True
             decision = _fallback_decision(observation, remaining)

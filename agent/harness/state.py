@@ -20,3 +20,5 @@ class InvestigationState(BaseModel):
     reasoning_model: str | None = None
     duration_ms: int = 0
     dead_end_count: int = 0
+    harness_version: str = "unversioned"
+    harness_config: dict = Field(default_factory=dict)
