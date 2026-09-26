@@ -5,13 +5,16 @@ export type ApiHealth = { status: string; mode: string };
 export type DemoIncident = { id: string; title: string; description: string; service: string; severity: string; symptoms: string[] };
 export type InvestigationEvidence = { id: string; source: string; summary: string; supports: string[]; contradicts: string[] };
 export type InvestigationHypothesis = { id: string; statement: string; confidence: number; status: string; evidence_ids: string[] };
+export type RetrievedMemory = { id: string; type: string; title: string; content: string; score?: number };
 export type InvestigationResult = {
   investigation_id: string | null;
   incident_id: string;
   observation: string;
   hypotheses: InvestigationHypothesis[];
   evidence: InvestigationEvidence[];
+  memories: RetrievedMemory[];
   consolidated_memory_ids: string[];
+  baseline_investigation_id: string | null;
   actions: string[];
   correction: string | null;
   correction_memory_ids?: string[];
@@ -20,6 +23,8 @@ export type InvestigationResult = {
   remediation: string[];
   reasoning_provider: string;
   reasoning_model: string | null;
+  duration_ms: number;
+  dead_end_count: number;
 };
 export type PersistedInvestigation = {
   id: string;
@@ -31,6 +36,7 @@ export type PersistedInvestigation = {
   evidence: InvestigationEvidence[];
   retrieved_memory_ids: string[];
   consolidated_memory_ids: string[];
+  baseline_investigation_id: string | null;
   actions: string[];
   action_count: number;
   correction: string | null;
@@ -40,6 +46,8 @@ export type PersistedInvestigation = {
   remediation: string[];
   reasoning_provider: string;
   reasoning_model: string | null;
+  duration_ms: number;
+  dead_end_count: number;
   created_at: string;
   completed_at: string | null;
 };
@@ -60,10 +68,10 @@ export function getHealth(): Promise<ApiHealth> { return request('/health'); }
 export function getDemoIncident(): Promise<DemoIncident> { return request('/incidents/demo'); }
 export function getInvestigations(limit = 20): Promise<PersistedInvestigation[]> { return request(`/investigations?limit=${limit}`); }
 export function getInvestigation(id: string): Promise<PersistedInvestigation> { return request(`/investigations/${encodeURIComponent(id)}`); }
-export function startInvestigation(observation: string): Promise<InvestigationResult> {
+export function startInvestigation(observation: string, baselineInvestigationId?: string | null): Promise<InvestigationResult> {
   return request('/investigations', {
     method: 'POST',
-    body: JSON.stringify({ incident_id: `INC-${Date.now()}`, observation, scenario: 'auto' }),
+    body: JSON.stringify({ incident_id: `INC-${Date.now()}`, observation, scenario: 'auto', baseline_investigation_id: baselineInvestigationId ?? null }),
   });
 }
 

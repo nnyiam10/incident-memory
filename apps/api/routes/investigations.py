@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from agent.harness.runner import investigate
+from agent.harness.runner import infer_scenario, investigate
+from agent.memory.retrieval import retrieve_feedback_for_investigation
 from agent.memory.consolidation import consolidate_investigation
 from database.investigations import attach_consolidated_memories, attach_correction, get_investigation, list_investigations, save_investigation
 from database.memories import save_human_feedback, save_memories
@@ -12,6 +13,7 @@ class StartRequest(BaseModel):
     observation: str
     scenario: str = "auto"
     correction: str | None = None
+    baseline_investigation_id: str | None = None
 
 class CorrectionRequest(BaseModel):
     correction: str
@@ -26,7 +28,17 @@ class CorrectionResponse(BaseModel):
 
 @router.post("")
 def start(request: StartRequest):
-    state = investigate(**request.model_dump())
+    payload = request.model_dump()
+    retrieved_feedback = []
+    if request.baseline_investigation_id:
+        scenario = infer_scenario(request.observation) if request.scenario == "auto" else request.scenario
+        service = "payments" if scenario == "payment_latency" else "checkout"
+        retrieved_feedback = retrieve_feedback_for_investigation(request.observation, service, request.baseline_investigation_id)
+        if retrieved_feedback:
+            payload["correction"] = "\n".join(memory["content"] for memory in retrieved_feedback)
+    state = investigate(**payload)
+    state.memories = retrieved_feedback
+    state.correction = request.correction
     saved = save_investigation(state, scenario=request.scenario)
     state.investigation_id = saved.id
     if saved.complete:

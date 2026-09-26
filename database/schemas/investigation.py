@@ -25,6 +25,7 @@ class Investigation(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     retrieved_memory_ids: list[str] = Field(default_factory=list)
     consolidated_memory_ids: list[str] = Field(default_factory=list)
+    baseline_investigation_id: str | None = None
     actions: list[str] = Field(default_factory=list)
     action_count: int = 0
     correction: str | None = None
@@ -34,5 +35,7 @@ class Investigation(BaseModel):
     remediation: list[str] = Field(default_factory=list)
     reasoning_provider: str = "openrouter"
     reasoning_model: str | None = None
+    duration_ms: int = 0
+    dead_end_count: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None

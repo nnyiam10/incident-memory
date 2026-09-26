@@ -19,6 +19,7 @@ def save_investigation(state: InvestigationState, scenario: str) -> Investigatio
         retrieved_memory_ids=[
             memory["id"] for memory in state.memories if memory.get("id")
         ],
+        baseline_investigation_id=state.baseline_investigation_id,
         actions=state.actions,
         action_count=len(state.actions),
         correction=state.correction,
@@ -27,6 +28,8 @@ def save_investigation(state: InvestigationState, scenario: str) -> Investigatio
         remediation=state.remediation,
         reasoning_provider=state.reasoning_provider,
         reasoning_model=state.reasoning_model,
+        duration_ms=state.duration_ms,
+        dead_end_count=state.dead_end_count,
         created_at=now,
         completed_at=now if state.complete else None,
     )

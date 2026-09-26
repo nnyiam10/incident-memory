@@ -11,13 +11,23 @@ def scripted_planner(actions):
 
 def test_model_planner_controls_investigation_order(monkeypatch):
     monkeypatch.setattr("agent.harness.runner.choose_next_action", scripted_planner(["search_logs", "query_metrics", None]))
-    result = investigate("INC-1", "upstream 502 errors", scenario="payment_latency")
+    result = investigate("INC-1", "upstream 502 errors", scenario="payment_latency", correction="Check logs before deployment history")
     assert [action.split(":", 1)[0] for action in result.actions] == ["search_logs", "query_metrics"]
     assert result.diagnosis == "Evidence-backed test diagnosis"
+
+def test_retrieved_correction_reduces_required_actions(monkeypatch):
+    monkeypatch.setattr("agent.harness.runner.choose_next_action", scripted_planner(["query_metrics", "search_logs", "get_deployments", None]))
+    first = investigate("INC-FIRST", "checkout timeouts", scenario="bad_deployment")
+    monkeypatch.setattr("agent.harness.runner.choose_next_action", scripted_planner(["query_metrics", "search_logs", None]))
+    second = investigate("INC-SECOND", "related checkout timeouts", scenario="bad_deployment", correction="Skip deployment history after pool-wait evidence", baseline_investigation_id="INV-FIRST")
+    assert len(first.actions) == 3
+    assert len(second.actions) == 2
+    assert second.baseline_investigation_id == "INV-FIRST"
 
 def test_incident_description_selects_different_simulated_evidence():
     assert infer_scenario("Payment provider returns 502 upstream errors") == "payment_latency"
     assert infer_scenario("Redis connection pool is exhausted") == "redis_exhaustion"
+    assert infer_scenario("Pool-wait warnings with no 502 responses") == "redis_exhaustion"
     assert infer_scenario("Timeouts began after latest deploy") == "bad_deployment"
 
 def test_repeated_model_action_is_rejected(monkeypatch):

@@ -10,6 +10,7 @@ class InvestigationState(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     memories: list[dict] = Field(default_factory=list)
     consolidated_memory_ids: list[str] = Field(default_factory=list)
+    baseline_investigation_id: str | None = None
     actions: list[str] = Field(default_factory=list)
     correction: str | None = None
     complete: bool = False
@@ -17,3 +18,5 @@ class InvestigationState(BaseModel):
     remediation: list[str] = Field(default_factory=list)
     reasoning_provider: str = "openrouter"
     reasoning_model: str | None = None
+    duration_ms: int = 0
+    dead_end_count: int = 0

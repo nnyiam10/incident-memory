@@ -38,7 +38,7 @@ def choose_next_action(observation: str, evidence: list[dict], completed_actions
         if any(term in text for term in ("deploy", "release", "config"))
         else "Start with query_metrics to identify which dependency or resource is saturated."
     )
-    payload = {"incident_observation": observation, "human_correction": correction, "triage_hint": triage_hint, "allowed_actions": allowed_actions, "completed_actions": completed_actions, "evidence": evidence}
+    payload = {"incident_observation": observation, "human_correction": correction, "minimum_evidence_sources": 2 if correction else 3, "triage_hint": triage_hint, "allowed_actions": allowed_actions, "completed_actions": completed_actions, "evidence": evidence}
     completion = model_client().chat.completions.create(
         model=REASONING_MODEL,
         messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": json.dumps(payload)}],

@@ -1,3 +1,4 @@
+from time import perf_counter
 from agent.harness.budget import Budget
 from agent.harness.planner import PlannerDecision, choose_next_action
 from agent.harness.state import InvestigationState
@@ -10,10 +11,11 @@ EXECUTABLE_TOOLS = {"get_deployments": get_deployments, "query_metrics": query_m
 
 def infer_scenario(observation: str) -> str:
     text = observation.lower()
-    if any(term in text for term in ("payment", "provider", "502", "upstream")):
-        return "payment_latency"
-    if any(term in text for term in ("redis", "connection", "pool exhausted", "leak")) and "deploy" not in text:
+    negates_provider_failure = any(term in text for term in ("no 502", "without 502", "provider may", "provider might"))
+    if any(term in text for term in ("redis", "connection", "pool exhausted", "pool-wait", "pool wait", "leak")) and not ("returns 502" in text or "provider latency" in text):
         return "redis_exhaustion"
+    if not negates_provider_failure and any(term in text for term in ("returns 502", "upstream error", "provider latency", "provider degraded")):
+        return "payment_latency"
     return "bad_deployment"
 
 def _fallback_decision(observation: str, remaining: list[str]) -> PlannerDecision:
@@ -29,10 +31,12 @@ def _fallback_conclusion(scenario: str, evidence_ids: list[str]) -> tuple[list[H
         return [Hypothesis(id="HYP-1", statement="Checkout is exhausting its Redis connections", confidence=.95, status="confirmed", evidence_ids=evidence_ids)], "Checkout reached its Redis client limit, exhausting the connection pool and delaying requests.", ["Validate connection cleanup in the sandbox and propose a bounded pool or client-lifecycle fix."]
     return [Hypothesis(id="HYP-1", statement="The latest deploy undersized the checkout Redis connection pool", confidence=.94, status="confirmed", evidence_ids=evidence_ids)], "The latest deployment reduced the Redis pool from 40 to 8, so checkout exhausts it under load.", ["Restore the prior pool size in the sandbox, validate recovery, then propose rollback and a deployment guard."]
 
-def investigate(incident_id: str, observation: str, scenario: str = "auto", correction: str | None = None) -> InvestigationState:
+def investigate(incident_id: str, observation: str, scenario: str = "auto", correction: str | None = None, baseline_investigation_id: str | None = None) -> InvestigationState:
+    started_at = perf_counter()
     resolved_scenario = infer_scenario(observation) if scenario == "auto" else scenario
-    state = InvestigationState(incident_id=incident_id, observation=observation, scenario=resolved_scenario, correction=correction, reasoning_model=REASONING_MODEL)
+    state = InvestigationState(incident_id=incident_id, observation=observation, scenario=resolved_scenario, correction=correction, baseline_investigation_id=baseline_investigation_id, reasoning_model=REASONING_MODEL)
     budget, completed_tools, last_decision, planner_failed = Budget(), [], None, False
+    minimum_evidence = 2 if correction else 3
 
     while budget.allows(len(state.actions)):
         remaining = [name for name in EXECUTABLE_TOOLS if name not in completed_tools]
@@ -43,7 +47,7 @@ def investigate(incident_id: str, observation: str, scenario: str = "auto", corr
             planner_failed = True
             decision = _fallback_decision(observation, remaining)
         last_decision = decision
-        if decision.sufficient_evidence and len(state.evidence) >= 2:
+        if decision.sufficient_evidence and len(state.evidence) >= minimum_evidence:
             break
         if decision.action is None:
             decision = _fallback_decision(observation, remaining)
@@ -65,5 +69,7 @@ def investigate(incident_id: str, observation: str, scenario: str = "auto", corr
         state.hypotheses, state.diagnosis, state.remediation = _fallback_conclusion(resolved_scenario, [item.id for item in state.evidence])
     if planner_failed:
         state.reasoning_provider = "deterministic_fallback"
+    state.dead_end_count = sum(1 for item in state.hypotheses if item.status == "ruled_out" or (item.status != "confirmed" and item.confidence <= .25))
+    state.duration_ms = round((perf_counter() - started_at) * 1000)
     state.complete = True
     return state

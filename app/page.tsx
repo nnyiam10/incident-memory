@@ -26,6 +26,7 @@ import { Progress } from '@/components/ui/progress';
 import {
   getDemoIncident,
   getHealth,
+  getInvestigation,
   getInvestigations,
   startInvestigation,
   submitCorrection,
@@ -136,14 +137,9 @@ export default function Home() {
   const [resultOrigin, setResultOrigin] = useState<'live' | 'restored' | null>(
     null,
   );
-  const [scenario, setScenario] = useState<'first' | 'second'>('second');
-  const stats = useMemo(
-    () =>
-      scenario === 'first'
-        ? { steps: 11, time: '6m 42s', deadEnds: 3, confidence: 86 }
-        : { steps: 5, time: '2m 18s', deadEnds: 0, confidence: 94 },
-    [scenario],
-  );
+  const [baselineId, setBaselineId] = useState<string | null>(null);
+  const [firstRun, setFirstRun] = useState<InvestigationResult | null>(null);
+  const [secondRun, setSecondRun] = useState<InvestigationResult | null>(null);
   const timeline = result ? timelineFromResult(result) : [];
 
   const evidenceById = useMemo(
@@ -155,15 +151,26 @@ export default function Home() {
   useEffect(() => {
     let active = true;
     Promise.all([getHealth(), getDemoIncident(), getInvestigations(1)])
-      .then(([, , saved]) => {
+      .then(async ([, , saved]) => {
         if (!active) return;
         setBackendStatus('connected');
         setQuery(
           'Checkout requests started timing out after the latest deploy.',
         );
         if (saved[0]) {
-          setResult({ ...saved[0], investigation_id: saved[0].id });
+          const latest = { ...saved[0], investigation_id: saved[0].id, memories: saved[0].retrieved_memory_ids.map((id) => ({ id, type: 'human_feedback', title: 'Retrieved correction', content: 'Correction retrieved from Atlas' })) };
+          setResult(latest);
           setResultOrigin('restored');
+          if (saved[0].baseline_investigation_id) {
+            const baseline = await getInvestigation(saved[0].baseline_investigation_id);
+            if (!active) return;
+            setBaselineId(baseline.id);
+            setFirstRun({ ...baseline, investigation_id: baseline.id, memories: baseline.retrieved_memory_ids.map((id) => ({ id, type: 'human_feedback', title: 'Retrieved correction', content: 'Correction retrieved from Atlas' })) });
+            setSecondRun(latest);
+          } else if (saved[0].correction) {
+            setBaselineId(saved[0].id);
+            setFirstRun(latest);
+          }
         }
       })
       .catch(() => {
@@ -179,8 +186,9 @@ export default function Home() {
     setRunning(true);
     setApiError(null);
     try {
-      const investigation = await startInvestigation(query.trim());
+      const investigation = await startInvestigation(query.trim(), baselineId);
       setResult(investigation);
+      if (baselineId) setSecondRun(investigation);
       setCorrectionText('');
       setSavedCorrectionId(null);
       setResultOrigin('live');
@@ -204,6 +212,9 @@ export default function Home() {
     setCorrectionError(null);
     try {
       const saved = await submitCorrection(investigationId, correctionText.trim());
+      setFirstRun({ ...result, correction: correctionText.trim(), correction_memory_ids: [...(result.correction_memory_ids ?? []), saved.memory_id] });
+      setBaselineId(investigationId);
+      setSecondRun(null);
       setSavedCorrectionId(saved.memory_id);
       setResult((current) => current ? {
         ...current,
@@ -487,11 +498,7 @@ export default function Home() {
       )}
       {activeTab === 'memory' && <MemoryView />}
       {activeTab === 'comparison' && (
-        <Comparison
-          stats={stats}
-          scenario={scenario}
-          setScenario={setScenario}
-        />
+        <Comparison first={firstRun} second={secondRun} onReset={() => { setBaselineId(null); setFirstRun(null); setSecondRun(null); setResult(null); setActiveTab('investigation'); }} />
       )}
       <footer className="page-footer">
         <span>
@@ -565,15 +572,12 @@ function MemoryView() {
   );
 }
 
-function Comparison({
-  stats,
-  scenario,
-  setScenario,
-}: {
-  stats: { steps: number; time: string; deadEnds: number; confidence: number };
-  scenario: 'first' | 'second';
-  setScenario: (s: 'first' | 'second') => void;
-}) {
+function Comparison({ first, second, onReset }: { first: InvestigationResult | null; second: InvestigationResult | null; onReset: () => void }) {
+  const confidence = (run: InvestigationResult | null) => Math.round(Math.max(...(run?.hypotheses.map((item) => item.confidence) ?? [0])) * 100);
+  const formatTime = (milliseconds: number | undefined) => milliseconds ? `${(milliseconds / 1000).toFixed(1)}s` : '—';
+  const stepsSaved = first && second ? first.actions.length - second.actions.length : 0;
+  const correctionApplied = Boolean(second?.memories?.length);
+  const improved = Boolean(first && second && correctionApplied && second.actions.length < first.actions.length);
   return (
     <section className="comparison-page">
       <div className="comparison-head">
@@ -581,27 +585,14 @@ function Comparison({
           <p className="eyebrow">MEMORY PAYOFF</p>
           <h2>The second incident is where the agent proves it learned.</h2>
         </div>
-        <div className="segmented">
-          <button
-            className={scenario === 'first' ? 'active' : ''}
-            onClick={() => setScenario('first')}
-          >
-            First incident
-          </button>
-          <button
-            className={scenario === 'second' ? 'active' : ''}
-            onClick={() => setScenario('second')}
-          >
-            Second incident
-          </button>
-        </div>
+        <div className="comparison-actions"><Badge>{improved ? 'Learning demonstrated' : second ? 'Learning not applied' : first ? 'Correction saved · run again' : 'Run → correct → rerun'}</Badge>{second && <Button onClick={onReset}>Start new experiment</Button>}</div>
       </div>
       <div className="metric-grid">
         {[
-          ['Investigation steps', String(stats.steps), '11 → 5'],
-          ['Time to diagnosis', stats.time, '66% faster'],
-          ['Dead ends', String(stats.deadEnds), '3 → 0'],
-          ['Final confidence', `${stats.confidence}%`, '+8 points'],
+          ['Investigation steps', second ? String(second.actions.length) : '—', first && second ? `${first.actions.length} → ${second.actions.length}` : 'Awaiting both runs'],
+          ['Time to diagnosis', formatTime(second?.duration_ms), first && second ? `${formatTime(first.duration_ms)} → ${formatTime(second.duration_ms)}` : 'Measured by API'],
+          ['Dead ends', second ? String(second.dead_end_count) : '—', first && second ? `${first.dead_end_count} → ${second.dead_end_count}` : 'Evidence-backed'],
+          ['Final confidence', second ? `${confidence(second)}%` : '—', first && second ? `${confidence(first)}% → ${confidence(second)}%` : 'Awaiting rerun'],
         ].map(([label, value, delta]) => (
           <article key={label}>
             <p>{label}</p>
@@ -616,15 +607,12 @@ function Comparison({
         </div>
         <div>
           <p className="eyebrow">CORRECTION REMEMBERED</p>
-          <h3>
-            “Payment provider failures appear as 502s, not pool-wait timeouts.”
-          </h3>
+          <h3>{first?.correction ? `“${first.correction}”` : 'Complete a run and submit a correction to begin the experiment.'}</h3>
           <p>
-            The second investigation used Maya’s correction to skip the
-            provider-status dead end and inspect deployment configuration first.
+            {second ? correctionApplied ? `The second investigation retrieved ${second.memories.length} correction and used ${Math.max(0, stepsSaved)} fewer diagnostic actions.` : 'No correction was retrieved, so this run does not demonstrate learning. Start a new experiment or verify the incident belongs to the same service.' : first ? 'Run a related incident now. The harness will retrieve this correction through Atlas Vector Search before planning.' : 'The comparison will use persisted action counts, elapsed time, dead ends, confidence, and retrieved memory provenance.'}
           </p>
         </div>
-        <Badge>Applied automatically</Badge>
+        <Badge>{correctionApplied ? 'Applied automatically' : second ? 'Not retrieved' : 'Waiting'}</Badge>
       </div>
     </section>
   );
