@@ -4,6 +4,19 @@ const API_BASE_URL =
 export type ApiHealth = { status: string; mode: string };
 export type DemoIncident = { id: string; title: string; description: string; service: string; severity: string; symptoms: string[] };
 export type InvestigationResult = { investigation_id: string | null; incident_id: string; observation: string; actions: string[]; correction: string | null; complete: boolean };
+export type PersistedInvestigation = {
+  id: string;
+  incident_id: string;
+  observation: string;
+  scenario: string;
+  status: string;
+  actions: string[];
+  action_count: number;
+  correction: string | null;
+  complete: boolean;
+  created_at: string;
+  completed_at: string | null;
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -19,6 +32,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getHealth(): Promise<ApiHealth> { return request('/health'); }
 export function getDemoIncident(): Promise<DemoIncident> { return request('/incidents/demo'); }
+export function getInvestigations(limit = 20): Promise<PersistedInvestigation[]> { return request(`/investigations?limit=${limit}`); }
+export function getInvestigation(id: string): Promise<PersistedInvestigation> { return request(`/investigations/${encodeURIComponent(id)}`); }
 export function startInvestigation(observation: string): Promise<InvestigationResult> {
   return request('/investigations', {
     method: 'POST',

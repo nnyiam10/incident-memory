@@ -28,3 +28,20 @@ def save_investigation(state: InvestigationState, scenario: str) -> Investigatio
     )
     database().investigations.insert_one(investigation.model_dump(mode="json"))
     return investigation
+
+
+def get_investigation(investigation_id: str) -> Investigation | None:
+    document = database().investigations.find_one({"id": investigation_id})
+    if not document:
+        return None
+    document.pop("_id", None)
+    return Investigation.model_validate(document)
+
+
+def list_investigations(limit: int = 20) -> list[Investigation]:
+    cursor = database().investigations.find().sort("created_at", -1).limit(limit)
+    investigations = []
+    for document in cursor:
+        document.pop("_id", None)
+        investigations.append(Investigation.model_validate(document))
+    return investigations

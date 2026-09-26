@@ -5,7 +5,7 @@ import { Activity, ArrowUpRight, BrainCircuit, Check, CircleDot, Database, GitCo
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { getDemoIncident, getHealth, startInvestigation, type InvestigationResult } from '@/lib/api';
+import { getDemoIncident, getHealth, getInvestigations, startInvestigation, type InvestigationResult } from '@/lib/api';
 
 const demoTimeline = [
   { time: '14:32:08', icon: Zap, tone: 'red', title: 'Alert received', detail: 'Checkout p95 latency exceeded 8s after deploy api-7f2c9d.' },
@@ -51,17 +51,22 @@ export default function Home() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [apiError, setApiError] = useState<string | null>(null);
   const [result, setResult] = useState<InvestigationResult | null>(null);
+  const [resultOrigin, setResultOrigin] = useState<'live' | 'restored' | null>(null);
   const [scenario, setScenario] = useState<'first' | 'second'>('second');
   const stats = useMemo(() => scenario === 'first' ? { steps: 11, time: '6m 42s', deadEnds: 3, confidence: 86 } : { steps: 5, time: '2m 18s', deadEnds: 0, confidence: 94 }, [scenario]);
   const timeline = result ? timelineFromResult(result) : demoTimeline;
 
   useEffect(() => {
     let active = true;
-    Promise.all([getHealth(), getDemoIncident()])
-      .then(([, incident]) => {
+    Promise.all([getHealth(), getDemoIncident(), getInvestigations(1)])
+      .then(([, , saved]) => {
         if (!active) return;
         setBackendStatus('connected');
-        setQuery(`Checkout requests started timing out after the latest deploy. ${incident.description}`);
+        setQuery('Checkout requests started timing out after the latest deploy.');
+        if (saved[0]) {
+          setResult({ ...saved[0], investigation_id: saved[0].id });
+          setResultOrigin('restored');
+        }
       })
       .catch(() => { if (active) setBackendStatus('offline'); });
     return () => { active = false; };
@@ -74,6 +79,7 @@ export default function Home() {
     try {
       const investigation = await startInvestigation(query.trim());
       setResult(investigation);
+      setResultOrigin('live');
       setBackendStatus('connected');
     } catch (error) {
       setBackendStatus('offline');
@@ -93,7 +99,7 @@ export default function Home() {
     <section className="command-wrap"><div className="command"><Search size={19} /><input aria-label="Incident description" value={query} onChange={e => setQuery(e.target.value)} /><Button onClick={runInvestigation} disabled={running || !query.trim()} className="run-button">{running ? 'Investigating…' : 'Investigate'} <ArrowUpRight size={16} /></Button></div><p><ShieldCheck size={13} /> Read-only diagnostics · fixes run only in sandbox</p>{apiError && <div className="api-error" role="alert"><X size={14}/><span>FastAPI is unavailable. Start it on port 8000 and try again.</span></div>}</section>
 
     {activeTab === 'investigation' && <div className="workspace-grid">
-      <section className="panel timeline-panel"><div className="panel-head"><div><p className="eyebrow">LIVE INVESTIGATION</p><h2>Evidence trail</h2></div><span className={`live-pill ${result ? 'api-backed' : ''}`}><span /> {result ? 'API result' : 'Demo state'}</span></div><div className="timeline">{timeline.map((item,index) => <div className="timeline-item" key={`${item.time}-${item.title}`}><div className={`timeline-icon ${item.tone}`}><item.icon size={16}/></div><div className="timeline-copy"><div><time>{item.time}</time><strong>{item.title}</strong></div><p>{item.detail}</p></div>{index < timeline.length-1 && <div className="timeline-line"/>}</div>)}</div><div className="diagnosis"><div className="diagnosis-title"><Check size={17}/><strong>{result ? 'FastAPI investigation received' : 'Evidence-backed diagnosis'}</strong><Badge>{result ? `${result.actions.length} actions` : '94% confidence'}</Badge></div><p>{result ? <>The frontend submitted incident <code>{result.incident_id}</code> to the bounded Python harness. The timeline above is rendered from the API response rather than static browser data.</> : <>Deploy <code>api-7f2c9d</code> reduced <code>REDIS_POOL_SIZE</code> from 40 to 8. Under production traffic, checkout workers exhaust the pool and wait until the 8-second request timeout.</>}</p><div className="remedy"><Lightbulb size={16}/><span><b>Next:</b> {result ? 'Persist this investigation in Atlas and stream each action as it happens.' : 'Restore pool size to 40, roll back the config-only change, and add a deploy guard requiring pool size ≥ worker concurrency.'}</span></div></div></section>
+      <section className="panel timeline-panel"><div className="panel-head"><div><p className="eyebrow">LIVE INVESTIGATION</p><h2>Evidence trail</h2></div><span className={`live-pill ${result ? 'api-backed' : ''}`}><span /> {resultOrigin === 'restored' ? 'Restored from Atlas' : result ? 'API result' : 'Demo state'}</span></div><div className="timeline">{timeline.map((item,index) => <div className="timeline-item" key={`${item.time}-${item.title}`}><div className={`timeline-icon ${item.tone}`}><item.icon size={16}/></div><div className="timeline-copy"><div><time>{item.time}</time><strong>{item.title}</strong></div><p>{item.detail}</p></div>{index < timeline.length-1 && <div className="timeline-line"/>}</div>)}</div><div className="diagnosis"><div className="diagnosis-title"><Check size={17}/><strong>{result ? 'Persisted investigation loaded' : 'Evidence-backed diagnosis'}</strong><Badge>{result ? `${result.actions.length} actions` : '94% confidence'}</Badge></div><p>{result ? <>Investigation <code>{result.investigation_id}</code> for incident <code>{result.incident_id}</code> is backed by Atlas. Refreshing the page reloads this timeline from FastAPI.</> : <>Deploy <code>api-7f2c9d</code> reduced <code>REDIS_POOL_SIZE</code> from 40 to 8. Under production traffic, checkout workers exhaust the pool and wait until the 8-second request timeout.</>}</p><div className="remedy"><Lightbulb size={16}/><span><b>Next:</b> {result ? 'Connect retrieved memories and hypotheses to persisted Atlas data.' : 'Restore pool size to 40, roll back the config-only change, and add a deploy guard requiring pool size ≥ worker concurrency.'}</span></div></div></section>
       <aside className="side-stack"><section className="panel memory-panel"><div className="panel-head"><div><p className="eyebrow">RETRIEVED MEMORY</p><h2>What the team already knows</h2></div><BrainCircuit size={19}/></div><div className="memory-list">{memories.map(m => <article className="memory-card" key={m.title}><div className="memory-label"><span className={m.color}>{m.type}</span><b>{m.score}</b></div><h3>{m.title}</h3><p>{m.body}</p><footer>{m.meta}</footer></article>)}</div></section></aside>
       <section className="panel hypothesis-panel"><div className="panel-head"><div><p className="eyebrow">REASONING STATE</p><h2>Current hypotheses</h2></div><span className="action-count">5 / 20 actions</span></div><div className="hypothesis-list">{hypotheses.map(h => <article className="hypothesis" key={h.rank}><span className="rank">0{h.rank}</span><div className="hyp-main"><div className="hyp-title"><h3>{h.title}</h3><span className={h.state === 'confirmed' ? 'confirmed':'ruled'}>{h.state === 'confirmed' ? <Check size={12}/> : <X size={12}/>} {h.state}</span></div><p>{h.evidence}</p><Progress value={h.confidence} className={h.state === 'confirmed' ? 'progress-good':'progress-muted'}/></div><strong>{h.confidence}%</strong></article>)}</div></section>
     </div>}

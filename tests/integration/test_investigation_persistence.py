@@ -1,4 +1,5 @@
 from apps.api.routes import investigations
+from database.schemas.investigation import Investigation
 
 
 class InsertResult:
@@ -40,3 +41,28 @@ def test_post_investigation_persists_actions(monkeypatch):
     assert saved["actions"] == response.actions
     assert saved["created_at"]
     assert saved["completed_at"]
+
+
+def saved_investigation():
+    return Investigation(
+        id="INV-SAVED",
+        incident_id="INC-SAVED",
+        observation="Saved observation",
+        scenario="bad_deployment",
+        status="completed",
+        actions=["query_metrics: {}"],
+        action_count=1,
+        complete=True,
+    )
+
+
+def test_list_investigations(monkeypatch):
+    monkeypatch.setattr(investigations, "list_investigations", lambda limit: [saved_investigation()])
+    result = investigations.list_saved(limit=1)
+    assert result[0].id == "INV-SAVED"
+
+
+def test_get_investigation(monkeypatch):
+    monkeypatch.setattr(investigations, "get_investigation", lambda investigation_id: saved_investigation())
+    result = investigations.get_saved("INV-SAVED")
+    assert result.incident_id == "INC-SAVED"
