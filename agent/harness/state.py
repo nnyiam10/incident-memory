@@ -13,3 +13,5 @@ class InvestigationState(BaseModel):
     complete: bool = False
     diagnosis: str | None = None
     remediation: list[str] = Field(default_factory=list)
+    reasoning_provider: str = "openrouter"
+    reasoning_model: str | None = None

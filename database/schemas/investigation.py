@@ -30,5 +30,7 @@ class Investigation(BaseModel):
     complete: bool = False
     diagnosis: str | None = None
     remediation: list[str] = Field(default_factory=list)
+    reasoning_provider: str = "openrouter"
+    reasoning_model: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None

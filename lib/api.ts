@@ -16,6 +16,8 @@ export type InvestigationResult = {
   complete: boolean;
   diagnosis: string | null;
   remediation: string[];
+  reasoning_provider: string;
+  reasoning_model: string | null;
 };
 export type PersistedInvestigation = {
   id: string;
@@ -32,6 +34,8 @@ export type PersistedInvestigation = {
   complete: boolean;
   diagnosis: string | null;
   remediation: string[];
+  reasoning_provider: string;
+  reasoning_model: string | null;
   created_at: string;
   completed_at: string | null;
 };
@@ -55,6 +59,6 @@ export function getInvestigation(id: string): Promise<PersistedInvestigation> { 
 export function startInvestigation(observation: string): Promise<InvestigationResult> {
   return request('/investigations', {
     method: 'POST',
-    body: JSON.stringify({ incident_id: `INC-${Date.now()}`, observation, scenario: 'bad_deployment' }),
+    body: JSON.stringify({ incident_id: `INC-${Date.now()}`, observation, scenario: 'auto' }),
   });
 }

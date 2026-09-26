@@ -8,7 +8,7 @@ router = APIRouter()
 class StartRequest(BaseModel):
     incident_id: str
     observation: str
-    scenario: str = "bad_deployment"
+    scenario: str = "auto"
     correction: str | None = None
 
 @router.post("")
