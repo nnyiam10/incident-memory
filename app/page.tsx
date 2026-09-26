@@ -10,6 +10,7 @@ import {
   Database,
   GitCommitHorizontal,
   Lightbulb,
+  MessageSquareText,
   MemoryStick,
   Search,
   ShieldCheck,
@@ -27,6 +28,7 @@ import {
   getHealth,
   getInvestigations,
   startInvestigation,
+  submitCorrection,
   type InvestigationResult,
 } from '@/lib/api';
 
@@ -127,6 +129,10 @@ export default function Home() {
   >('checking');
   const [apiError, setApiError] = useState<string | null>(null);
   const [result, setResult] = useState<InvestigationResult | null>(null);
+  const [correctionText, setCorrectionText] = useState('');
+  const [savingCorrection, setSavingCorrection] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [savedCorrectionId, setSavedCorrectionId] = useState<string | null>(null);
   const [resultOrigin, setResultOrigin] = useState<'live' | 'restored' | null>(
     null,
   );
@@ -175,6 +181,8 @@ export default function Home() {
     try {
       const investigation = await startInvestigation(query.trim());
       setResult(investigation);
+      setCorrectionText('');
+      setSavedCorrectionId(null);
       setResultOrigin('live');
       setBackendStatus('connected');
     } catch (error) {
@@ -186,6 +194,27 @@ export default function Home() {
       );
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function saveCorrection() {
+    const investigationId = result?.investigation_id;
+    if (!investigationId || !correctionText.trim() || savingCorrection) return;
+    setSavingCorrection(true);
+    setCorrectionError(null);
+    try {
+      const saved = await submitCorrection(investigationId, correctionText.trim());
+      setSavedCorrectionId(saved.memory_id);
+      setResult((current) => current ? {
+        ...current,
+        correction: correctionText.trim(),
+        correction_memory_ids: [...(current.correction_memory_ids ?? []), saved.memory_id],
+      } : current);
+      setCorrectionText('');
+    } catch (error) {
+      setCorrectionError(error instanceof Error ? error.message : 'The correction could not be saved.');
+    } finally {
+      setSavingCorrection(false);
     }
   }
 
@@ -345,6 +374,32 @@ export default function Home() {
                       : 'No remediation has been proposed.'}
                   </span>
                 </div>
+              </div>
+            )}
+            {result?.complete && (
+              <div className="correction-card">
+                <div className="correction-heading">
+                  <MessageSquareText size={17} />
+                  <div>
+                    <strong>Correct this investigation</strong>
+                    <p>Teach the agent what it got wrong or missed. Your correction becomes durable human feedback.</p>
+                  </div>
+                </div>
+                {result.correction ? (
+                  <div className="correction-saved" role="status">
+                    <Check size={16} />
+                    <div><strong>Correction stored in memory</strong><p>{result.correction}</p><small>{savedCorrectionId ?? result.correction_memory_ids?.at(-1)} · embedded and searchable in Atlas</small></div>
+                  </div>
+                ) : (
+                  <>
+                    <textarea aria-label="Human correction" value={correctionText} onChange={(event) => setCorrectionText(event.target.value)} placeholder="Example: Provider failures appear as 502s; Redis pool waits indicate connection exhaustion." rows={3} />
+                    <div className="correction-actions">
+                      <span>Saved as human_feedback with investigation provenance</span>
+                      <Button onClick={saveCorrection} disabled={!correctionText.trim() || savingCorrection}>{savingCorrection ? 'Learning…' : 'Save correction'}</Button>
+                    </div>
+                    {correctionError && <p className="correction-error" role="alert">{correctionError}</p>}
+                  </>
+                )}
               </div>
             )}
           </section>

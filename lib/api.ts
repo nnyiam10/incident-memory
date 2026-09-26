@@ -13,6 +13,7 @@ export type InvestigationResult = {
   evidence: InvestigationEvidence[];
   actions: string[];
   correction: string | null;
+  correction_memory_ids?: string[];
   complete: boolean;
   diagnosis: string | null;
   remediation: string[];
@@ -31,6 +32,7 @@ export type PersistedInvestigation = {
   actions: string[];
   action_count: number;
   correction: string | null;
+  correction_memory_ids: string[];
   complete: boolean;
   diagnosis: string | null;
   remediation: string[];
@@ -60,5 +62,13 @@ export function startInvestigation(observation: string): Promise<InvestigationRe
   return request('/investigations', {
     method: 'POST',
     body: JSON.stringify({ incident_id: `INC-${Date.now()}`, observation, scenario: 'auto' }),
+  });
+}
+
+export type CorrectionResult = { investigation_id: string; memory_id: string; memory_type: string; embedding_model: string; indexed_by: string };
+export function submitCorrection(investigationId: string, correction: string): Promise<CorrectionResult> {
+  return request(`/investigations/${encodeURIComponent(investigationId)}/corrections`, {
+    method: 'POST',
+    body: JSON.stringify({ correction, author: 'human' }),
   });
 }

@@ -11,6 +11,7 @@ class MemoryType(StrEnum):
 
 class Provenance(BaseModel):
     incident_id: str
+    investigation_id: str | None = None
     evidence_ids: list[str] = Field(default_factory=list)
     author: str = "agent"
 
@@ -27,4 +28,3 @@ class Memory(BaseModel):
     supersedes: str | None = None
     status: str = "active"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-

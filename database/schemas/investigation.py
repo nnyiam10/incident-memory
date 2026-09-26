@@ -27,6 +27,7 @@ class Investigation(BaseModel):
     actions: list[str] = Field(default_factory=list)
     action_count: int = 0
     correction: str | None = None
+    correction_memory_ids: list[str] = Field(default_factory=list)
     complete: bool = False
     diagnosis: str | None = None
     remediation: list[str] = Field(default_factory=list)

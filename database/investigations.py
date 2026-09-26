@@ -49,3 +49,14 @@ def list_investigations(limit: int = 20) -> list[Investigation]:
         document.pop("_id", None)
         investigations.append(Investigation.model_validate(document))
     return investigations
+
+
+def attach_correction(investigation_id: str, correction: str, memory_id: str) -> Investigation | None:
+    database().investigations.update_one(
+        {"id": investigation_id},
+        {
+            "$set": {"correction": correction},
+            "$addToSet": {"correction_memory_ids": memory_id},
+        },
+    )
+    return get_investigation(investigation_id)
