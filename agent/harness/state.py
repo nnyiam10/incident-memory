@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from database.schemas.investigation import Evidence, Hypothesis
 
 class InvestigationState(BaseModel):
+    investigation_id: str | None = None
     incident_id: str
     observation: str
     hypotheses: list[Hypothesis] = Field(default_factory=list)
@@ -10,4 +11,3 @@ class InvestigationState(BaseModel):
     actions: list[str] = Field(default_factory=list)
     correction: str | None = None
     complete: bool = False
-

@@ -3,7 +3,7 @@ const API_BASE_URL =
 
 export type ApiHealth = { status: string; mode: string };
 export type DemoIncident = { id: string; title: string; description: string; service: string; severity: string; symptoms: string[] };
-export type InvestigationResult = { incident_id: string; observation: string; actions: string[]; correction: string | null; complete: boolean };
+export type InvestigationResult = { investigation_id: string | null; incident_id: string; observation: string; actions: string[]; correction: string | null; complete: boolean };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
